@@ -1,0 +1,1059 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Chef-a-tooey's Culinary Kingdom - Ultimate Engine</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        body {
+            margin: 0;
+            background-color: #1a1a24;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: 'Press Start 2P', cursive;
+            color: white;
+            overflow: hidden;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none;
+        }
+        canvas {
+            display: block;
+            border: 6px solid #2c3e50;
+            border-radius: 12px;
+            box-shadow: 0 15px 50px rgba(0,0,0,0.9), inset 0 0 20px rgba(255,255,255,0.2);
+            background-color: #000;
+            filter: contrast(1.15) saturate(1.3) brightness(1.05); 
+            max-width: 100vw;
+            max-height: 100vh;
+            object-fit: contain;
+        }
+        .controls {
+            margin-top: 15px;
+            color: #888;
+            font-size: 11px;
+            text-align: center;
+            line-height: 1.8;
+            text-shadow: 1px 1px 0 #000;
+        }
+        kbd {
+            background: #2c3e50;
+            padding: 4px 8px;
+            border-radius: 4px;
+            border: 1px solid #34495e;
+            border-bottom: 3px solid #1a252f;
+            color: #ecf0f1;
+            font-weight: bold;
+        }
+
+        /* --- VIRTUAL CONTROLLER FOR iPAD --- */
+        #virtual-controller {
+            display: none; /* Hidden on desktop by default */
+            position: absolute;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            pointer-events: none; /* Lets clicks pass through the empty space to the canvas menus */
+            z-index: 100;
+        }
+        
+        /* If the device has a touch screen, show the controller */
+        @media (pointer: coarse) {
+            #virtual-controller { display: block; }
+            .controls { display: none; } /* Hide keyboard instructions */
+            canvas { border: none; border-radius: 0; } /* Maximize screen space on mobile */
+        }
+
+        .vc-btn {
+            pointer-events: auto; /* Makes the buttons actually clickable */
+            background: rgba(44, 62, 80, 0.7);
+            border: 3px solid rgba(255, 255, 255, 0.4);
+            color: white;
+            border-radius: 50%;
+            font-size: 24px;
+            display: flex; justify-content: center; align-items: center;
+            user-select: none; -webkit-user-select: none;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+            transition: transform 0.1s, background 0.1s;
+        }
+        .vc-btn:active, .vc-btn.active {
+            background: rgba(230, 126, 34, 0.9);
+            transform: scale(0.9);
+            border-color: #fff;
+        }
+
+        /* Position the touch buttons */
+        .vc-bottom-left { position: absolute; bottom: 30px; left: 20px; display: flex; gap: 15px; }
+        .vc-bottom-left .vc-btn { width: 70px; height: 70px; }
+        
+        .vc-bottom-right { position: absolute; bottom: 30px; right: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .vc-bottom-right .vc-btn { width: 65px; height: 65px; }
+        
+        .vc-top-left { position: absolute; top: 60px; left: 15px; display: flex; flex-direction: column; gap: 12px; }
+        .vc-top-right { position: absolute; top: 60px; right: 15px; display: flex; flex-direction: column; gap: 12px; }
+        .small-btn { width: 45px !important; height: 45px !important; font-size: 18px !important; border-radius: 12px !important; }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas" width="1024" height="576"></canvas>
+    
+    <div class="controls">
+        <kbd>←</kbd> <kbd>→</kbd> Move &nbsp; <kbd>↑</kbd> Jump &nbsp; <kbd>SHIFT</kbd> Run &nbsp; <kbd>SPACE</kbd> Spatula &nbsp; <kbd>Z</kbd> Time Freeze &nbsp; <kbd>E</kbd> Emote &nbsp; <kbd>ESC</kbd> Menu<br><br>
+        <strong>EAT FOOD:</strong> <kbd>1</kbd> Pizza (Life) &nbsp; <kbd>2</kbd> Spicy Soup (Invincible) &nbsp; <kbd>3</kbd> Magic Salad (Freeze)
+    </div>
+
+    <!-- VIRTUAL TOUCH CONTROLLER (Hidden on PC, Visible on iPad) -->
+    <div id="virtual-controller">
+        <div class="vc-bottom-left">
+            <div class="vc-btn" id="btn-left">◀</div>
+            <div class="vc-btn" id="btn-right">▶</div>
+        </div>
+        <div class="vc-bottom-right">
+            <div class="vc-btn" id="btn-spat">🍳</div>
+            <div class="vc-btn" id="btn-run">🏃</div>
+            <div style="grid-column: span 2; display: flex; justify-content: center;">
+                <div class="vc-btn" id="btn-jump" style="width: 145px; border-radius: 35px;">▲ JUMP</div>
+            </div>
+        </div>
+        <div class="vc-top-left">
+            <div class="vc-btn small-btn" id="btn-piz">🍕</div>
+            <div class="vc-btn small-btn" id="btn-sou">🍲</div>
+            <div class="vc-btn small-btn" id="btn-sal">🥗</div>
+        </div>
+        <div class="vc-top-right">
+            <div class="vc-btn small-btn" id="btn-esc">☰</div>
+            <div class="vc-btn small-btn" id="btn-frz">🧊</div>
+            <div class="vc-btn small-btn" id="btn-em">🕺</div>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // 1. ENGINE SETUP & STATE
+        // ==========================================
+        const canvas = document.getElementById('gameCanvas');
+        const c = canvas.getContext('2d');
+
+        // Global State Variables
+        let gameState = 'MENU'; 
+        let frameCount = 0;
+        let score = 0;
+        let coins = 0;
+        let lives = 3;
+        let camera = { x: 0, y: 0 };
+        let currentLevelIndex = 0;
+        let timeFreezeTimer = 0;
+        let powerCooldown = 0;
+
+        // Game Objects
+        let player = null;
+        let activeLevel = { platforms: [], enemies: [], items: [], goal: null, bossLevel: false };
+        let particles = [];
+        let clouds = [];
+        let customLevel = { platforms: [], enemies: [], items: [], goal: null };
+        let petPositions = [];
+
+        // Input
+        const keys = { right: false, left: false, up: false, shift: false, space: false, z: false, e: false };
+
+        // Progression & Inventory
+        const inventory = { chef: ['default'], spatula: ['default'], pet: [], power: [], emote: [] };
+        const equipped = { chef: 'default', spatula: 'default', pets: [], power: 'none', emote: 'none' };
+        const stats = { coinsCollected: 0, onionsStomped: 0, pizzasMade: 0, bossesDefeated: 0 };
+        const rawIngredients = { tomato: 0, basil: 0, dough: 0, mushroom: 0, chili: 0 };
+        const crafted = { pizza: 0, soup: 0, salad: 0 };
+        let kitchenPot = [];
+        
+        // MOD EDITOR VARIABLES
+        const activeMods = { 
+            moon: false, turbo: false, mini: false,
+            customGravity: 0.5, customSpeed: 5, customJump: 15
+        };
+
+        // Level Data
+        const LEVEL_DATA = [
+            { platforms: [{x:0, y:500, w:1000, h:80, type:'wood'}, {x:500, y:350, w:200, h:40, type:'cheese'}, {x:800, y:250, w:200, h:40, type:'cheese'}, {x:1200, y:500, w:800, h:80, type:'wood'}], enemies: [{x:600, y:300, type:'onion', dist:150}, {x:1400, y:450, type:'meatball', dist:200}], items: [{x:550, y:280, type:'coin'}, {x:600, y:280, type:'coin'}, {x:900, y:200, type:'mushroom'}, {x:1300, y:430, type:'coin'}], goal: {x: 1800, y: 320} },
+            { platforms: [{x:0, y:500, w:400, h:80, type:'wood'}, {x:500, y:450, w:150, h:40, type:'cheese'}, {x:800, y:400, w:150, h:40, type:'cheese'}, {x:1100, y:350, w:150, h:40, type:'cheese'}, {x:1400, y:500, w:800, h:80, type:'wood'}], enemies: [{x:1500, y:450, type:'egg', dist:200}, {x:1700, y:450, type:'onion', dist:100}], items: [{x:520, y:380, type:'coin'}, {x:820, y:330, type:'coin'}, {x:1120, y:280, type:'coin'}], goal: {x: 2100, y: 320} },
+            { bossLevel: true, platforms: [{x:0, y:500, w:1200, h:80, type:'marble'}, {x:100, y:350, w:150, h:30, type:'cheese'}, {x:950, y:350, w:150, h:30, type:'cheese'}, {x:525, y:250, w:150, h:30, type:'cheese'}], enemies: [], items: [{x:600, y:450, type:'mushroom'}], goal: null }
+        ];
+
+        const SHOP_ITEMS = [
+            { id: 'ninja', type: 'chef', name: 'Ninja Chef', cost: 20, c1: '#2c3e50', c2: '#1a252f' },
+            { id: 'gold', type: 'chef', name: 'Golden Chef', cost: 50, c1: '#f1c40f', c2: '#f39c12' },
+            { id: 'hamburger', type: 'chef', name: 'Burger', cost: 60, c1: '#e67e22', c2: '#f39c12' },
+            { id: 'hotdog', type: 'chef', name: 'Hotdog', cost: 60, c1: '#e74c3c', c2: '#f1c40f' },
+            { id: 'panda', type: 'chef', name: 'Panda Chef', cost: 70, c1: '#ecf0f1', c2: '#2d3436' }, 
+            { id: 'taco', type: 'chef', name: 'Taco Chef', cost: 70, c1: '#f1c40f', c2: '#2ecc71' },
+            { id: 'golden', type: 'spatula', name: 'Gold Spat', cost: 30, c1: '#d35400', c2: '#f1c40f' },
+            { id: 'fire', type: 'spatula', name: 'Fire Spat', cost: 40, c1: '#c0392b', c2: '#ff7f50' },
+            { id: 'jimmybob', type: 'pet', name: 'Jimmy Bob', cost: 80, c1: '#3498db', c2: '#2980b9' },
+            { id: 'petspatula', type: 'pet', name: 'Pet Spatula', cost: 80, c1: '#95a5a6', c2: '#7f8c8d' },
+            { id: 'timefreeze', type: 'power', name: 'Time Freeze', cost: 150, c1: '#00cec9', c2: '#0984e3' },
+            { id: 'gritty', type: 'emote', name: 'The Gritty', cost: 100, c1: '#8e44ad', c2: '#9b59b6' }
+        ];
+
+        const MODS = [
+            { id: 'moon', name: 'Moon Boots', desc: 'Low Gravity' },
+            { id: 'turbo', name: 'Turbo Speed', desc: 'Run Fast' },
+            { id: 'mini', name: 'Mini Chef', desc: 'Half Size' }
+        ];
+
+        const QUESTS = [
+            { id: 'q1', name: 'Coin Collector', desc: 'Collect 10 Coins.', target: 10, reward: 20, stat: 'coinsCollected', claimed: false },
+            { id: 'q2', name: 'Onion Smasher', desc: 'Stomp/Swat 3 Onions.', target: 3, reward: 30, stat: 'onionsStomped', claimed: false },
+            { id: 'q3', name: 'Pizza Chef', desc: 'Cook a Perfect Pizza.', target: 1, reward: 50, stat: 'pizzasMade', claimed: false },
+            { id: 'q4', name: 'Boss Slayer', desc: 'Defeat King Gorgon-zola.', target: 1, reward: 100, stat: 'bossesDefeated', claimed: false }
+        ];
+
+        // Menu Buttons
+        const menuBtns = [
+            { label: 'PLAY', x: 240, y: 250, w: 250, h: 55, c: '#e67e22', action: () => startLevel(0) },
+            { label: 'EDITOR', x: 530, y: 250, w: 250, h: 55, c: '#2ecc71', action: () => gameState = 'EDITOR' },
+            { label: 'SHOP', x: 240, y: 330, w: 250, h: 55, c: '#9b59b6', action: () => gameState = 'SHOP' },
+            { label: 'QUESTS', x: 530, y: 330, w: 250, h: 55, c: '#3498db', action: () => gameState = 'QUESTS' },
+            { label: 'KITCHEN', x: 240, y: 410, w: 250, h: 55, c: '#e74c3c', action: () => gameState = 'KITCHEN' },
+            { label: 'MOD LAB', x: 530, y: 410, w: 250, h: 55, c: '#34495e', action: () => gameState = 'MODS' }
+        ];
+
+        // Editor layout
+        let editorTool = 'wood';
+        const editorTools = [
+            { id:'wood', label:'WOOD', x:10, w:80, c:'#8d6e63' }, 
+            { id:'cheese', label:'CHEESE', x:100, w:90, c:'#f1c40f' },
+            { id:'onion', label:'ONION', x:200, w:80, c:'#d35400' }, 
+            { id:'meatball', label:'MEATBALL', x:290, w:110, c:'#c0392b' },
+            { id:'coin', label:'COIN', x:410, w:70, c:'#f1c40f' }, 
+            { id:'chili', label:'CHILI', x:490, w:80, c:'#e74c3c' },
+            { id:'goal', label:'GOAL', x:580, w:70, c:'#95a5a6' }, 
+            { id:'eraser', label:'ERASE', x:660, w:80, c:'#e74c3c' }
+        ];
+        const editorActions = [
+            { id:'test', label:'TEST', x:760, w:70, c:'#2ecc71' }, 
+            { id:'clear', label:'CLEAR', x:840, w:80, c:'#e74c3c' },
+            { id:'exit', label:'EXIT', x:930, w:70, c:'#3498db' }
+        ];
+
+        // ==========================================
+        // 2. AUDIO SYSTEM
+        // ==========================================
+        let audioCtx = null;
+        function initAudio() {
+            if (!audioCtx) { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+        }
+        function playTone(freq, type, duration, endFreq, vol=0.1) {
+            if(!audioCtx) return; 
+            const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
+            osc.type = type; osc.frequency.setValueAtTime(freq, audioCtx.currentTime); if(endFreq) osc.frequency.exponentialRampToValueAtTime(endFreq, audioCtx.currentTime + duration);
+            gain.gain.setValueAtTime(vol, audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+            osc.connect(gain); gain.connect(audioCtx.destination); osc.start(); osc.stop(audioCtx.currentTime + duration);
+        }
+        function sfx(name) {
+            if(!audioCtx) return;
+            switch(name) {
+                case 'jump': playTone(300, 'square', 0.1, 500, 0.05); break;
+                case 'land': playTone(100, 'sawtooth', 0.05, 50, 0.1); break;
+                case 'coin': playTone(1200, 'sine', 0.05, 1200, 0.05); setTimeout(()=>playTone(1600, 'square', 0.08, 1600, 0.05), 60); break;
+                case 'stomp': playTone(100, 'sawtooth', 0.05, 50, 0.1); break;
+                case 'bump': playTone(150, 'square', 0.1, 100, 0.1); break;
+                case 'powerup': [440, 554, 659, 880].forEach((f, i) => setTimeout(() => playTone(f, 'square', 0.1, f, 0.1), i*80)); break;
+                case 'freeze': [800, 700, 600, 500].forEach((f, i) => setTimeout(() => playTone(f, 'sine', 0.2, f, 0.15), i*100)); break;
+                case 'chili': [880, 987, 1046, 1174, 1318].forEach((f, i) => setTimeout(() => playTone(f, 'square', 0.1, f, 0.15), i*50)); break;
+                case 'ingredient': playTone(800, 'sine', 0.1, 1000, 0.1); setTimeout(()=>playTone(1200, 'sine', 0.1, 1400, 0.1), 100); break;
+                case 'perfectPizza': [523, 659, 784, 1046, 1318, 1567].forEach((f, i) => setTimeout(() => playTone(f, 'square', 0.1, f, 0.2), i*100)); break;
+                case 'cook': [300, 400, 500].forEach((f, i) => setTimeout(() => playTone(f, 'square', 0.1, f, 0.1), i*100)); break;
+                case 'spatula': playTone(600, 'sawtooth', 0.1, 200, 0.1); break;
+                case 'dance': [400, 500, 600, 500, 400, 500, 600, 800].forEach((f, i) => setTimeout(() => playTone(f, 'sine', 0.1, f, 0.1), i*150)); break;
+                case 'hurt': playTone(200, 'sawtooth', 0.1, 100, 0.1); setTimeout(() => playTone(150, 'sawtooth', 0.2, 50, 0.1), 100); break;
+                case 'bossHit': playTone(100, 'sawtooth', 0.2, 80, 0.2); break;
+                case 'gameOver': [300, 250, 200, 150].forEach((f, i) => setTimeout(() => playTone(f, 'sawtooth', 0.3, f-50, 0.2), i*300)); break;
+                case 'win': [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => playTone(f, 'square', 0.1, f, 0.2), i*150)); break;
+                case 'buy': [800, 1200, 1600].forEach((f, i) => setTimeout(() => playTone(f, 'sine', 0.1, f, 0.1), i*80)); break;
+                case 'error': playTone(150, 'sawtooth', 0.2, 100, 0.1); break;
+            }
+        }
+
+        // ==========================================
+        // 3. UTILITIES & ENTITIES 
+        // ==========================================
+        
+        function drawRounded(ctx, x, y, w, h, r) {
+            if(ctx.roundRect) { ctx.beginPath(); ctx.roundRect(x,y,w,h,r); ctx.fill(); } else { ctx.fillRect(x,y,w,h); }
+        }
+
+        class Entity {
+            constructor(x, y, w, h) { 
+                this.x = x; this.y = y; this.w = w; this.h = h; 
+                this.vx = 0; this.vy = 0; this.markedForDeletion = false; 
+            }
+            draw(ctx, offset) {}
+            update() {}
+        }
+
+        class Platform extends Entity {
+            constructor(data) {
+                super(data.x, data.y, data.w, data.h);
+                this.type = data.type || 'wood';
+                this.holes = [];
+                if(this.type === 'cheese') {
+                    for(let i=0; i<Math.floor(this.w / 40); i++) this.holes.push({ x: Math.random() * (this.w - 20) + 10, y: Math.random() * (this.h - 20) + 10, r: Math.random() * 4 + 2 });
+                }
+            }
+            draw(c, offset) {
+                const dx = this.x - offset;
+                c.fillStyle = 'rgba(0,0,0,0.4)'; c.fillRect(dx + 10, this.y + 10, this.w, this.h);
+                c.save(); c.beginPath(); if(c.roundRect) c.roundRect(dx, this.y, this.w, this.h, 12); else c.rect(dx, this.y, this.w, this.h); c.clip();
+
+                if(this.type === 'cheese') {
+                    const grad = c.createLinearGradient(dx, this.y, dx, this.y + this.h);
+                    grad.addColorStop(0, '#f1c40f'); grad.addColorStop(1, '#e67e22');
+                    c.fillStyle = grad; c.fillRect(dx, this.y, this.w, this.h);
+                    c.fillStyle = 'rgba(211, 84, 0, 0.6)'; this.holes.forEach(h => { c.beginPath(); c.arc(dx+h.x, this.y+h.y, h.r, 0, Math.PI*2); c.fill(); });
+                } else if (this.type === 'marble') {
+                    const grad = c.createLinearGradient(dx, this.y, dx, this.y + this.h);
+                    grad.addColorStop(0, '#ffffff'); grad.addColorStop(1, '#bdc3c7');
+                    c.fillStyle = grad; c.fillRect(dx, this.y, this.w, this.h);
+                    c.strokeStyle = 'rgba(0,0,0,0.1)'; c.lineWidth = 3; c.beginPath(); c.moveTo(dx, this.y+this.h); c.lineTo(dx+this.w, this.y); c.stroke();
+                } else {
+                    const grad = c.createLinearGradient(dx, this.y, dx, this.y + this.h);
+                    grad.addColorStop(0, '#a17561'); grad.addColorStop(1, '#5d4037');
+                    c.fillStyle = grad; c.fillRect(dx, this.y, this.w, this.h);
+                    c.fillStyle = 'rgba(0,0,0,0.15)'; for(let i=0; i<this.w; i+=20) c.fillRect(dx+i, this.y, 3, this.h);
+                }
+                c.fillStyle = 'rgba(255,255,255,0.4)'; c.fillRect(dx, this.y, this.w, 6); 
+                c.restore();
+            }
+        }
+
+        class Player extends Entity {
+            constructor() {
+                super(100, 100, 40, 60);
+                this.onGround = false; this.facing = 1; this.squash = 1;
+                this.health = 1; this.invulnerable = 0; this.attackTimer = 0; this.attackCooldown = 0; 
+                this.spicyTimer = 0; this.emoteTimer = 0; this.scaleMod = 1.0;
+                
+                // Mod Editor Variables
+                this.speed = activeMods.customSpeed; 
+                this.jumpPower = activeMods.customJump; 
+                if (activeMods.turbo) this.speed *= 2;
+                if (activeMods.moon) this.jumpPower += 5;
+                if (activeMods.mini) { this.scaleMod = 0.5; this.w = 20; this.h = 30; this.y += 30; }
+            }
+            update() {
+                if (keys.e && equipped.emote === 'gritty' && this.onGround && this.emoteTimer <= 0) {
+                    this.emoteTimer = 100; sfx('dance');
+                }
+
+                if (this.emoteTimer > 0) {
+                    this.emoteTimer--; this.vx = 0;
+                } else {
+                    let currentMax = keys.shift ? this.speed*1.6 : this.speed;
+                    if (this.spicyTimer > 0) { this.spicyTimer--; currentMax = keys.shift ? this.speed*2.5 : this.speed*1.8; if (this.spicyTimer % 5 === 0) particles.push(new Particle(this.x+this.w/2, this.y+this.h, 'spark')); }
+
+                    if (keys.right) { this.vx = currentMax; this.facing = 1; } else if (keys.left) { this.vx = -currentMax; this.facing = -1; } else { this.vx *= 0.75; }
+
+                    if(keys.up && this.onGround) {
+                        this.vy = -this.jumpPower; this.onGround = false; this.squash = 0.5; sfx('jump');
+                        for(let i=0; i<6; i++) particles.push(new Particle(this.x + 20, this.y + 60, 'smoke'));
+                    }
+                    if(!keys.up && this.vy < -5) this.vy = -5;
+
+                    if (this.attackCooldown > 0) this.attackCooldown--;
+                    if (this.attackTimer > 0) this.attackTimer--;
+                    if (keys.space && this.attackCooldown <= 0) { this.attackTimer = 15; this.attackCooldown = 30; sfx('spatula'); }
+                }
+
+                let gravityToApply = activeMods.customGravity;
+                if (activeMods.moon) gravityToApply *= 0.4;
+                
+                this.vy += gravityToApply; this.x += this.vx; this.handleCollisions('x'); this.y += this.vy; this.handleCollisions('y');
+
+                this.squash += (1 - this.squash) * 0.15; 
+                if(this.invulnerable > 0) this.invulnerable--;
+                if(this.y > 1000) handleDeath();
+            }
+            handleCollisions(axis) {
+                for (let p of activeLevel.platforms) {
+                    if (this.x < p.x + p.w && this.x + this.w > p.x && this.y < p.y + p.h && this.y + this.h > p.y) {
+                        if (axis === 'x') { if (this.vx > 0) this.x = p.x - this.w; if (this.vx < 0) this.x = p.x + p.w; this.vx = 0; }
+                        if (axis === 'y') {
+                            if (this.vy > 0) { this.y = p.y - this.h; this.onGround = true; this.vy = 0; if(this.squash > 0.8 && this.vy > 10) { this.squash = 1.4; sfx('land'); } } 
+                            else { this.y = p.y + p.h; this.vy = 0; sfx('bump'); }
+                        }
+                    }
+                }
+            }
+            hit() {
+                if(this.invulnerable > 0 || this.spicyTimer > 0) return;
+                if(this.health > 1) { this.health = 1; this.invulnerable = 120; this.h = 60 * this.scaleMod; this.y += 20 * this.scaleMod; sfx('hurt'); for(let i=0; i<15; i++) particles.push(new Particle(this.x + this.w/2, this.y + this.h/2, 'spark')); } 
+                else { handleDeath(); }
+            }
+            grow() {
+                if(this.health === 1) { this.health = 2; this.h = 80 * this.scaleMod; this.y -= 20 * this.scaleMod; sfx('powerup'); for(let i=0; i<10; i++) particles.push(new Particle(this.x + this.w/2, this.y, 'spark')); }
+            }
+            draw(c, offset) {
+                const drawX = this.x - offset; const drawY = this.y;
+                if(this.invulnerable > 0 && Math.floor(Date.now() / 100) % 2 === 0) return;
+                const cx = drawX + this.w/2; const cy = drawY + this.h;
+                c.save(); c.translate(cx, cy); c.scale(this.squash, 1/this.squash); c.scale(this.scaleMod, this.scaleMod); c.translate(-cx, -cy);
+
+                let bodyColor = '#ffffff'; let hatColor = '#ffffff';
+                const eqChef = SHOP_ITEMS.find(i => i.id === equipped.chef);
+                let skinId = eqChef ? eqChef.id : 'default';
+
+                if (this.spicyTimer > 0) {
+                    const colors = ['#ff4757', '#ffa502', '#2ed573', '#1e90ff', '#9b59b6'];
+                    bodyColor = colors[Math.floor(Date.now() / 50) % colors.length]; hatColor = colors[(Math.floor(Date.now() / 50) + 1) % colors.length];
+                } else if (eqChef && skinId !== 'hamburger' && skinId !== 'hotdog' && skinId !== 'panda' && skinId !== 'taco') {
+                    bodyColor = eqChef.c1; hatColor = eqChef.c2;
+                }
+
+                const drawW = 40; const drawH = this.health === 2 ? 80 : 60; const dX = cx - drawW/2; const dY = cy - drawH;
+                c.fillStyle = 'rgba(0,0,0,0.3)'; c.beginPath(); c.ellipse(dX + drawW/2, dY + drawH + 5, drawW/1.5, 5, 0, 0, Math.PI * 2); c.fill();
+
+                if (skinId === 'hamburger' && this.spicyTimer <= 0) {
+                    c.fillStyle = '#e67e22'; c.beginPath(); c.arc(dX + drawW/2, dY + drawH - 30, drawW/2, Math.PI, 0); c.fill(); 
+                    c.fillStyle = '#2ecc71'; c.fillRect(dX, dY + drawH - 30, drawW, 6); 
+                    c.fillStyle = '#5c4033'; c.fillRect(dX + 2, dY + drawH - 24, drawW - 4, 12); 
+                    c.fillStyle = '#e67e22'; drawRounded(c, dX, dY + drawH - 12, drawW, 12, 6);
+                    c.fillStyle = '#111'; const eyeX = this.facing === 1 ? dX + drawW - 12 : dX + 8; c.beginPath(); c.ellipse(eyeX, dY + drawH - 18, 3, 5, 0, 0, Math.PI*2); c.fill();
+                } else if (skinId === 'hotdog' && this.spicyTimer <= 0) {
+                    c.fillStyle = '#f39c12'; drawRounded(c, dX, dY + 10, drawW, drawH - 10, 10);
+                    c.fillStyle = '#c0392b'; drawRounded(c, dX + 8, dY + 5, drawW - 16, drawH, 8);
+                    c.strokeStyle = '#f1c40f'; c.lineWidth = 3; c.beginPath(); c.moveTo(dX + drawW/2, dY + 10); c.lineTo(dX + drawW/2 - 5, dY + 25); c.lineTo(dX + drawW/2 + 5, dY + 40); c.lineTo(dX + drawW/2 - 5, dY + 55); c.stroke();
+                    c.fillStyle = '#111'; const eyeX = this.facing === 1 ? dX + drawW - 12 : dX + 8; c.beginPath(); c.ellipse(eyeX, dY + 20, 3, 5, 0, 0, Math.PI*2); c.fill();
+                } else if (skinId === 'panda' && this.spicyTimer <= 0) {
+                    c.fillStyle = '#2d3436'; c.beginPath(); c.arc(dX + 5, dY + (this.health===2?10:0), 8, 0, Math.PI*2); c.fill(); c.beginPath(); c.arc(dX + drawW - 5, dY + (this.health===2?10:0), 8, 0, Math.PI*2); c.fill();
+                    c.fillStyle = '#ecf0f1'; drawRounded(c, dX, dY + (this.health === 2 ? 30 : 20), drawW, drawH - (this.health === 2 ? 30 : 20), 8);
+                    c.fillStyle = '#2d3436'; let legCycle = (this.onGround && Math.abs(this.vx) > 0.5) ? Math.sin(Date.now() / 100) * 12 : 0; if (!this.onGround) legCycle = -5;
+                    drawRounded(c, dX - 5, dY + drawH - 25, 8, 15, 4); drawRounded(c, dX + drawW - 3, dY + drawH - 25, 8, 15, 4);
+                    drawRounded(c, dX + 8 + legCycle, dY + drawH - 5, 10, 10, 4); drawRounded(c, dX + 22 - legCycle, dY + drawH - 5, 10, 10, 4);
+                    c.fillStyle = '#ecf0f1'; drawRounded(c, dX + 2, dY + (this.health === 2 ? 10 : 0), drawW - 4, 25, 8);
+                    c.fillStyle = '#2d3436'; const ex1 = this.facing === 1 ? dX + drawW - 14 : dX + 6; const ex2 = this.facing === 1 ? dX + drawW - 6 : dX + 14;
+                    c.beginPath(); c.ellipse(ex1, dY + (this.health===2?16:6) + 4, 5, 7, 0, 0, Math.PI*2); c.fill(); c.beginPath(); c.ellipse(ex2, dY + (this.health===2?16:6) + 4, 5, 7, 0, 0, Math.PI*2); c.fill();
+                    c.fillStyle = 'white'; c.beginPath(); c.arc(ex1 + this.facing*2, dY + (this.health===2?16:6) + 3, 2, 0, Math.PI*2); c.fill(); c.beginPath(); c.arc(ex2 + this.facing*2, dY + (this.health===2?16:6) + 3, 2, 0, Math.PI*2); c.fill();
+                    c.fillStyle = '#fff'; const hatHeight = this.health === 2 ? 35 : 18; const hatWobble = Math.sin(Date.now()/150) * 4; c.beginPath(); c.moveTo(dX, dY + (this.health === 2 ? 12 : 2)); c.bezierCurveTo(dX - 10 - hatWobble, dY - hatHeight, dX + drawW + 10 + hatWobble, dY - hatHeight, dX + drawW, dY + (this.health === 2 ? 12 : 2)); c.fill();
+                } else if (skinId === 'taco' && this.spicyTimer <= 0) {
+                    c.fillStyle = '#f1c40f'; c.beginPath(); c.arc(dX + drawW/2, dY + drawH - 10, drawW/2 + 5, Math.PI, 0); c.fill();
+                    c.fillStyle = '#5c4033'; c.fillRect(dX + 5, dY + drawH - 15, drawW - 10, 5); c.fillStyle = '#2ecc71'; c.fillRect(dX + 5, dY + drawH - 20, drawW - 10, 5);
+                    c.fillStyle = '#e74c3c'; c.fillRect(dX + 10, dY + drawH - 25, 5, 5); c.fillRect(dX + 25, dY + drawH - 25, 5, 5);
+                    c.fillStyle = '#111'; const eyeX = this.facing === 1 ? dX + drawW - 12 : dX + 8; c.beginPath(); c.ellipse(eyeX, dY + drawH - 25, 3, 5, 0, 0, Math.PI*2); c.fill();
+                    c.fillStyle = '#2c3e50'; let legCycle = (this.onGround && Math.abs(this.vx) > 0.5) ? Math.sin(Date.now() / 100) * 12 : 0; if (!this.onGround) legCycle = -5;
+                    drawRounded(c, dX + 8 + legCycle, dY + drawH - 10, 10, 10, 4); drawRounded(c, dX + 22 - legCycle, dY + drawH - 10, 10, 10, 4);
+                } else {
+                    const bGrad = c.createLinearGradient(dX, dY, dX + drawW, dY); bGrad.addColorStop(0, bodyColor); bGrad.addColorStop(1, '#bdc3c7'); c.fillStyle = bGrad;
+                    drawRounded(c, dX, dY + (this.health === 2 ? 30 : 20), drawW, drawH - (this.health === 2 ? 30 : 20), 8);
+                    c.fillStyle = '#2c3e50'; let legCycle = (this.onGround && Math.abs(this.vx) > 0.5) ? Math.sin(Date.now() / 100) * 12 : 0; if (!this.onGround) legCycle = -5; 
+                    
+                    if (this.emoteTimer > 0) {
+                        legCycle = Math.sin(this.emoteTimer * 0.4) * 10; this.squash = 1 - Math.abs(Math.sin(this.emoteTimer * 0.4)) * 0.15; 
+                        c.fillStyle = '#ffccaa'; let handY = dY + drawH - 20; let leftHandX = dX - 5 + Math.sin(this.emoteTimer * 0.4) * 15; let rightHandX = dX + drawW + 5 + Math.sin(this.emoteTimer * 0.4) * 15;
+                        c.beginPath(); c.arc(leftHandX, handY, 6, 0, Math.PI*2); c.fill(); c.beginPath(); c.arc(rightHandX, handY, 6, 0, Math.PI*2); c.fill();
+                    }
+                    drawRounded(c, dX + 8 + legCycle, dY + drawH - 5, 10, 10, 4); drawRounded(c, dX + 22 - legCycle, dY + drawH - 5, 10, 10, 4);
+
+                    c.fillStyle = '#2c3e50'; c.beginPath(); c.arc(dX + drawW/2, dY + drawH - 20, 3, 0, Math.PI*2); c.fill(); c.beginPath(); c.arc(dX + drawW/2, dY + drawH - 32, 3, 0, Math.PI*2); c.fill();
+                    c.fillStyle = '#ffccaa'; drawRounded(c, dX + 2, dY + (this.health === 2 ? 10 : 0), drawW - 4, 25, 8);
+                    c.fillStyle = '#111'; const eyeX = this.facing === 1 ? dX + drawW - 12 : dX + 8; c.beginPath(); c.ellipse(eyeX, dY + (this.health === 2 ? 16 : 6) + 4, 3, 5, 0, 0, Math.PI*2); c.fill();
+                    c.fillStyle = '#3e2723'; const mustacheDir = this.facing === 1 ? 4 : -4; drawRounded(c, dX + drawW/2 + mustacheDir - 12, dY + (this.health === 2 ? 28 : 18), 24, 8, 4);
+                    c.fillStyle = hatColor; const hatHeight = this.health === 2 ? 35 : 18; const hatWobble = Math.sin(Date.now()/150) * 4; c.beginPath(); c.moveTo(dX, dY + (this.health === 2 ? 12 : 2)); c.bezierCurveTo(dX - 10 - hatWobble, dY - hatHeight, dX + drawW + 10 + hatWobble, dY - hatHeight, dX + drawW, dY + (this.health === 2 ? 12 : 2)); c.fill();
+                }
+                
+                // SPATULA
+                if (this.attackTimer > 0 && this.emoteTimer <= 0) {
+                    c.save(); c.translate(dX + (this.facing === 1 ? drawW : 0), dY + drawH - 30); let angle = (15 - this.attackTimer) * 7; if (this.facing === -1) angle = -angle; c.rotate(angle * Math.PI / 180);
+                    let spatHandleColor = '#7f8c8d'; let spatHeadColor = '#bdc3c7'; const eqSpat = SHOP_ITEMS.find(i => i.id === equipped.spatula); if (eqSpat) { spatHandleColor = eqSpat.c1; spatHeadColor = eqSpat.c2; }
+                    c.fillStyle = spatHandleColor; c.fillRect((this.facing===1 ? 0 : -30), -5, 30, 8); c.fillStyle = spatHeadColor; drawRounded(c, (this.facing===1 ? 30 : -45), -18, 18, 32, 4);
+                    c.fillStyle = '#2c3e50'; c.fillRect((this.facing===1 ? 35 : -40), -12, 8, 4); c.fillRect((this.facing===1 ? 35 : -40), -2, 8, 4); c.fillRect((this.facing===1 ? 35 : -40), 8, 8, 4); c.restore();
+                }
+                c.restore();
+            }
+        }
+
+        class Enemy extends Entity {
+            constructor(x, y, type, patrolDist) {
+                super(x, y, 40, 40); this.type = type; this.startX = x; this.patrolDist = patrolDist; this.dir = 1; this.hp = (type === 'boss') ? 3 : 1; this.iframes = 0; this.warmup = (type === 'boss') ? 120 : 0; this.aiTimer = 0; this.rot = 0;
+                if(this.type === 'boss') { this.w = 80; this.h = 80; }
+            }
+            update() {
+                if(timeFreezeTimer > 0) return; 
+                if(this.iframes > 0) this.iframes--; if(this.warmup > 0) { this.warmup--; return; }
+
+                if (this.type === 'onion') { this.x += 2 * this.dir; if (this.x > this.startX + this.patrolDist || this.x < this.startX) this.dir *= -1; } 
+                else if (this.type === 'meatball') { this.x += 3 * this.dir; this.rot += 0.2 * this.dir; if (this.x > this.startX + this.patrolDist || this.x < this.startX) this.dir *= -1; this.vy += activeMods.customGravity; this.y += this.vy; if(this.y > 460) { this.y = 460; this.vy = -10; } }
+                else if (this.type === 'egg') { this.x += 3 * this.dir; if (this.x > this.startX + this.patrolDist || this.x < this.startX) this.dir *= -1; this.y = this.startX + Math.sin(frameCount * 0.05) * 50 + 50; }
+                else if (this.type === 'boss') {
+                    this.aiTimer++; const dx = player.x - this.x; if (this.aiTimer % 30 === 0) { this.dir = (dx > 0) ? 1 : -1; }
+                    let speed = (this.hp === 3) ? 1.5 : (this.hp === 2 ? 3.5 : 6); this.x += this.dir * speed;
+                    if(this.onGround && Math.random() < 0.02) { this.vy = -18; this.onGround = false; }
+                    this.vy += activeMods.customGravity; this.y += this.vy;
+                    if(this.y + this.h >= 500) { this.y = 500 - this.h; this.vy = 0; this.onGround = true; }
+                    if (this.x < 0) { this.x = 0; this.dir = 1; } if (this.x > 1200) { this.x = 1200; this.dir = -1; }
+                }
+            }
+            draw(c, offset) {
+                const drawX = this.x - offset; const cx = drawX + this.w/2; const cy = this.y + this.h/2;
+                
+                if (this.type === 'boss') {
+                    if(this.iframes > 0 && Math.floor(Date.now() / 100) % 2 === 0) return; 
+                    c.fillStyle = 'rgba(0,0,0,0.4)'; c.beginPath(); c.ellipse(cx, this.y + this.h, this.w/1.5, 6, 0, 0, Math.PI*2); c.fill();
+                    if(this.warmup > 0 && Math.floor(Date.now()/100)%2===0) { c.strokeStyle = 'white'; c.lineWidth = 3; c.beginPath(); c.arc(cx, cy, 45, 0, Math.PI*2); c.stroke(); }
+                    const rGrad = c.createRadialGradient(cx - 10, cy - 10, 5, cx, cy, this.w); const color1 = this.hp === 1 ? '#ff4757' : '#f1c40f'; const color2 = this.hp === 1 ? '#c0392b' : '#d35400';
+                    rGrad.addColorStop(0, '#fff'); rGrad.addColorStop(0.3, color1); rGrad.addColorStop(1, color2);
+                    c.fillStyle = rGrad; c.beginPath(); c.ellipse(cx, cy, this.w/2 + Math.sin(Date.now()/150)*3, this.h/2 - Math.sin(Date.now()/150)*3, 0, 0, Math.PI*2); c.fill();
+                    c.fillStyle = '#f1c40f'; c.beginPath(); c.moveTo(drawX, this.y); c.lineTo(drawX + 10, this.y - 25); c.lineTo(drawX + 20, this.y - 5); c.lineTo(drawX + 30, this.y - 25); c.lineTo(drawX + 40, this.y); c.fill();
+                    c.fillStyle = 'black'; c.beginPath(); c.ellipse(drawX + 12, this.y + 20, 4, 6, 0, 0, Math.PI*2); c.fill(); c.beginPath(); c.ellipse(drawX + 28, this.y + 20, 4, 6, 0, 0, Math.PI*2); c.fill();
+                    c.lineWidth = 3; c.beginPath(); c.arc(drawX + 20, this.y + 35, 12, 0, Math.PI, false); c.stroke(); 
+                    return;
+                }
+
+                c.fillStyle = 'rgba(0,0,0,0.3)'; c.beginPath(); c.ellipse(cx, this.y + this.h, this.w/2.5, 4, 0, 0, Math.PI*2); c.fill();
+                c.save(); c.translate(cx, cy); if(this.type === 'meatball') c.rotate(this.rot);
+                const grad = c.createRadialGradient(-5, -5, 2, 0, 0, 20);
+                if(this.type === 'onion') { grad.addColorStop(0, '#e67e22'); grad.addColorStop(1, '#d35400'); }
+                if(this.type === 'meatball') { grad.addColorStop(0, '#ff4757'); grad.addColorStop(1, '#c0392b'); }
+                if(this.type === 'egg') { grad.addColorStop(0, '#ffffff'); grad.addColorStop(1, '#bdc3c7'); }
+                c.fillStyle = grad; c.beginPath(); if (this.type === 'egg') { c.ellipse(0, 0, 15, 20, 0, 0, Math.PI*2); } else { c.arc(0, 0, 20, 0, Math.PI*2); } c.fill();
+                if(this.type === 'meatball') { c.fillStyle = '#78281f'; c.beginPath(); c.arc(8, 8, 4, 0, Math.PI*2); c.fill(); c.beginPath(); c.arc(-10, 5, 5, 0, Math.PI*2); c.fill(); c.beginPath(); c.arc(2, -12, 3, 0, Math.PI*2); c.fill(); }
+                c.restore();
+                c.fillStyle = 'white'; c.beginPath(); c.ellipse(drawX+14, this.y+15, 5, 7, 0, 0, Math.PI*2); c.fill(); c.beginPath(); c.ellipse(drawX+26, this.y+15, 5, 7, 0, 0, Math.PI*2); c.fill();
+                c.fillStyle = '#111'; c.beginPath(); c.arc(drawX+14 + this.dir*2, this.y+15, 2, 0, Math.PI*2); c.fill(); c.beginPath(); c.arc(drawX+26 + this.dir*2, this.y+15, 2, 0, Math.PI*2); c.fill();
+                if(this.type === 'onion') { c.fillStyle = '#2ecc71'; drawRounded(c, drawX + 16, this.y - 15, 8, 20, 4); }
+                if(this.type === 'egg') { c.fillStyle = '#fff'; c.beginPath(); c.moveTo(drawX, this.y+10); c.lineTo(drawX-15, this.y-5+Math.sin(Date.now()/100)*10); c.lineTo(drawX, this.y+20); c.fill(); c.beginPath(); c.moveTo(drawX+this.w, this.y+10); c.lineTo(drawX+this.w+15, this.y-5-Math.sin(Date.now()/100)*10); c.lineTo(drawX+this.w, this.y+20); c.fill(); }
+            }
+        }
+
+        class Item extends Entity {
+            constructor(x, y, type) { super(x, y, 30, 30); this.type = type; this.phase = Math.random() * Math.PI * 2; }
+            draw(c, offset) {
+                const dx = this.x - offset; const bob = Math.sin(Date.now() / 200 + this.phase) * 5; const cx = dx + 15; const cy = this.y + 15 + bob;
+                c.shadowBlur = 15; c.shadowColor = 'rgba(255,255,255,0.5)';
+                if(this.type === 'coin') {
+                    c.save(); c.translate(cx, cy); c.scale(Math.abs(Math.sin(Date.now()/300)), 1); c.fillStyle = '#f1c40f'; c.beginPath(); c.arc(0, 0, 14, 0, Math.PI*2); c.fill(); c.fillStyle = '#f39c12'; c.beginPath(); c.arc(0, 0, 9, 0, Math.PI*2); c.fill(); c.restore();
+                } else if (this.type === 'mushroom') {
+                    c.fillStyle = '#e74c3c'; c.beginPath(); c.arc(cx, cy - 5, 16, Math.PI, 0); c.fill(); c.fillStyle = '#ecf0f1'; c.fillRect(cx - 7, cy - 5, 14, 15); c.fillStyle = '#fff'; c.beginPath(); c.arc(cx, cy - 10, 5, 0, Math.PI*2); c.fill();
+                } else if (this.type === 'chili') {
+                    c.fillStyle = '#ff4757'; c.beginPath(); c.moveTo(cx - 10, cy - 10); c.quadraticCurveTo(cx + 15, cy - 10, cx + 12, cy + 15); c.quadraticCurveTo(cx, cy, cx - 10, cy - 10); c.fill(); c.fillStyle = '#2ecc71'; c.fillRect(cx - 12, cy - 14, 6, 6);
+                } else if (this.type === 'tomato') {
+                    const rGrad = c.createRadialGradient(cx-4, cy-4, 2, cx, cy, 12); rGrad.addColorStop(0, '#ff7f50'); rGrad.addColorStop(1, '#e74c3c'); c.fillStyle = rGrad; c.beginPath(); c.arc(cx, cy, 14, 0, Math.PI*2); c.fill(); c.fillStyle = '#2ecc71'; c.beginPath(); c.moveTo(cx, cy-14); c.lineTo(cx+6, cy-8); c.lineTo(cx, cy-10); c.lineTo(cx-6, cy-8); c.fill();
+                } else if (this.type === 'basil') {
+                    c.fillStyle = '#2ecc71'; c.beginPath(); c.ellipse(cx - 6, cy, 12, 6, -Math.PI/4, 0, Math.PI*2); c.fill(); c.beginPath(); c.ellipse(cx + 6, cy, 12, 6, Math.PI/4, 0, Math.PI*2); c.fill();
+                } else if (this.type === 'dough') {
+                    c.fillStyle = '#f39c12'; c.beginPath(); c.ellipse(cx, cy, 18, 12, 0, 0, Math.PI*2); c.fill(); c.fillStyle = '#f1c40f'; c.beginPath(); c.ellipse(cx-3, cy-3, 10, 5, 0, 0, Math.PI*2); c.fill();
+                }
+                c.shadowBlur = 0;
+            }
+        }
+
+        class Goal extends Entity { 
+            constructor(data) { super(data.x, data.y, 40, 180); } 
+            draw(c, offset) { 
+                const x = this.x - offset; const y = this.y;
+                const gradHandle = c.createLinearGradient(x, y, x+20, y); gradHandle.addColorStop(0, '#5D4037'); gradHandle.addColorStop(1, '#3E2723'); c.fillStyle = gradHandle; c.fillRect(x + 10, y + 120, 20, 60);
+                const gradBlade = c.createLinearGradient(x, y, x+40, y); gradBlade.addColorStop(0, '#ecf0f1'); gradBlade.addColorStop(0.5, '#ffffff'); gradBlade.addColorStop(1, '#bdc3c7'); c.fillStyle = gradBlade; c.beginPath(); c.moveTo(x + 20, y + 120); c.lineTo(x + 20, y); c.bezierCurveTo(x+40, y, x+40, y+100, x+20, y+120); c.fill();
+                c.fillStyle = 'rgba(255,255,255,0.8)'; c.beginPath(); c.moveTo(x+25, y+110); c.lineTo(x+28, y+20); c.lineTo(x+30, y+20); c.lineTo(x+28, y+110); c.fill();
+            } 
+        }
+
+        class Particle extends Entity {
+            constructor(x, y, type) { super(x, y, 6, 6); this.type = type; this.vx = (Math.random() - 0.5) * 8; this.vy = (Math.random() - 0.5) * 8; this.life = 1.0; this.color = type === 'smoke' ? 'rgba(236, 240, 241, 0.8)' : `hsl(${Math.random()*60+40}, 100%, 60%)`; this.size = Math.random() * 6 + 4; }
+            update() { this.x += this.vx; this.y += this.vy; this.life -= 0.04; if(this.type === 'spark') { this.vy += 0.3; this.size *= 0.95; } else { this.size *= 1.05; } }
+            draw(c, offset) { c.globalAlpha = Math.max(0, this.life); c.fillStyle = this.color; if (this.type === 'spark') { c.save(); c.translate(this.x - offset, this.y); c.rotate(Date.now() / 100); c.fillRect(-this.size/2, -this.size/2, this.size, this.size); c.restore(); } else { c.beginPath(); c.arc(this.x - offset, this.y, this.size, 0, Math.PI*2); c.fill(); } c.globalAlpha = 1.0; }
+        }
+
+        // ==========================================
+        // 5. CORE GAME FUNCTIONS & RENDERING
+        // ==========================================
+        
+        // Touch Bindings Helper
+        function bindTouch(id, actionOn, actionOff) {
+            const el = document.getElementById(id);
+            if(!el) return;
+            el.addEventListener('touchstart', e => { e.preventDefault(); el.classList.add('active'); actionOn(); });
+            el.addEventListener('touchend', e => { e.preventDefault(); el.classList.remove('active'); actionOff(); });
+            el.addEventListener('touchcancel', e => { e.preventDefault(); el.classList.remove('active'); actionOff(); });
+        }
+
+        // Action Tap Helper (triggers once per tap)
+        function bindTap(id, action) {
+            const el = document.getElementById(id);
+            if(!el) return;
+            el.addEventListener('touchstart', e => { e.preventDefault(); el.classList.add('active'); action(); });
+            el.addEventListener('touchend', e => { e.preventDefault(); el.classList.remove('active'); });
+            el.addEventListener('touchcancel', e => { e.preventDefault(); el.classList.remove('active'); });
+        }
+
+        // Bind virtual controls
+        bindTouch('btn-left', () => keys.left = true, () => keys.left = false);
+        bindTouch('btn-right', () => keys.right = true, () => keys.right = false);
+        bindTouch('btn-jump', () => { if(player && player.onGround && gameState === 'PLAY') keys.up = true; else keys.up = true; }, () => keys.up = false);
+        bindTouch('btn-spat', () => keys.space = true, () => keys.space = false);
+        bindTouch('btn-run', () => keys.shift = true, () => keys.shift = false);
+
+        bindTap('btn-piz', () => { if(gameState === 'PLAY' && crafted.pizza > 0) { crafted.pizza--; lives++; sfx('powerup'); particles.push(new Particle(player.x, player.y, 'spark')); }});
+        bindTap('btn-sou', () => { if(gameState === 'PLAY' && crafted.soup > 0) { crafted.soup--; player.spicyTimer = 900; sfx('chili'); }});
+        bindTap('btn-sal', () => { if(gameState === 'PLAY' && crafted.salad > 0 && timeFreezeTimer <= 0) { crafted.salad--; timeFreezeTimer = 600; sfx('freeze'); }});
+        bindTap('btn-frz', () => { keys.z = true; setTimeout(() => keys.z = false, 50); });
+        bindTap('btn-em', () => { keys.e = true; setTimeout(() => keys.e = false, 50); });
+        bindTap('btn-esc', () => { gameState = 'MENU'; keys.right = false; keys.left = false; keys.shift = false; keys.up = false; keys.space = false; keys.z = false; keys.e = false; });
+
+        function drawBtn(x, y, w, h, bg, text, font = '14px "Press Start 2P"') {
+            c.fillStyle = '#2c3e50'; drawRounded(c, x+5, y+5, w, h, 6);
+            c.fillStyle = bg; drawRounded(c, x, y, w, h, 6);
+            c.strokeStyle = '#fff'; c.lineWidth = 4; if (c.roundRect) { c.beginPath(); c.roundRect(x, y, w, h, 6); c.stroke(); } else { c.strokeRect(x, y, w, h); }
+            c.fillStyle = 'white'; c.font = font; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(text, x + w/2, y + h/2 + 2);
+        }
+
+        function drawEditorBtn(btn, isActive) {
+            c.fillStyle = isActive ? 'white' : btn.c;
+            drawRounded(c, btn.x, 20, btn.w, 40, 6);
+            c.fillStyle = 'black'; c.font = '10px "Press Start 2P"'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(btn.label, btn.x + btn.w/2, 42);
+        }
+
+        function startLevel(index) {
+            currentLevelIndex = index;
+            timeFreezeTimer = 0; powerCooldown = 0;
+            
+            if(index === 0 && !LEVEL_DATA[0].ultimateAdded) { LEVEL_DATA[0].items.push({x: 300, y: 400, type: 'chili'}, {x: 700, y: 150, type: 'tomato'}); LEVEL_DATA[0].ultimateAdded = true; }
+            if(index === 1 && !LEVEL_DATA[1].ultimateAdded) { LEVEL_DATA[1].items.push({x: 600, y: 250, type: 'basil'}, {x: 1000, y: 250, type: 'dough'}); LEVEL_DATA[1].ultimateAdded = true; }
+
+            const data = (index === -1) ? customLevel : LEVEL_DATA[index];
+            activeLevel = {
+                platforms: data.platforms.map(p => new Platform(p)),
+                enemies: data.enemies.map(e => new Enemy(e.x, e.y, e.type, e.dist)),
+                items: data.items.map(i => new Item(i.x, i.y, i.type)),
+                goal: data.goal ? new Goal(data.goal) : null,
+                bossLevel: data.bossLevel || false
+            };
+
+            if(activeLevel.bossLevel) { activeLevel.enemies.push(new Enemy(800, 300, 'boss', 0)); }
+
+            player = new Player();
+            petPositions = []; camera.x = 0; particles = [];
+            gameState = 'PLAY';
+            if(index === 0) { score = 0; lives = 3; rawIngredients.tomato=0; rawIngredients.basil=0; rawIngredients.dough=0; rawIngredients.mushroom=0; rawIngredients.chili=0; }
+        }
+
+        function handleDeath() {
+            sfx('hurt'); lives--;
+            if(lives > 0) { startLevel(currentLevelIndex); } else { gameState = 'GAMEOVER'; sfx('gameOver'); }
+        }
+
+        function updatePlay() {
+            player.update();
+            let targetX = player.x - canvas.width * 0.35;
+            if(targetX < 0) targetX = 0;
+            camera.x += (targetX - camera.x) * 0.1;
+
+            if (equipped.pets.length > 0) {
+                equipped.pets.forEach((petId, idx) => {
+                    if (!petPositions[idx]) petPositions[idx] = { x: player.x, y: player.y };
+                    let pPos = petPositions[idx];
+                    let targetPetX = player.x + (player.facing === 1 ? -40 - idx*45 : 40 + idx*45);
+                    let targetPetY = player.y - 10 + Math.sin(frameCount * 0.1 + idx) * 5;
+                    pPos.x += (targetPetX - pPos.x) * 0.1; pPos.y += (targetPetY - pPos.y) * 0.1;
+                });
+            }
+
+            if (keys.z && equipped.power === 'timefreeze' && powerCooldown <= 0 && timeFreezeTimer <= 0) { timeFreezeTimer = 600; powerCooldown = 1200; sfx('freeze'); }
+            if (powerCooldown > 0) powerCooldown--;
+            if (timeFreezeTimer > 0) timeFreezeTimer--;
+
+            let attackHitbox = null;
+            if (player.attackTimer > 0) attackHitbox = { x: player.x + (player.facing === 1 ? player.w : -40), y: player.y + 10, w: 40, h: 50 };
+
+            activeLevel.enemies.forEach(e => {
+                e.update();
+                if (attackHitbox && !e.markedForDeletion && attackHitbox.x < e.x + e.w && attackHitbox.x + attackHitbox.w > e.x && attackHitbox.y < e.y + e.h && attackHitbox.y + attackHitbox.h > e.y) {
+                    if (e.type === 'boss') {
+                        if (e.iframes <= 0) {
+                            e.hp--; e.iframes = 60; sfx('bossHit'); e.x += (player.x < e.x) ? 60 : -60;
+                            if (e.hp <= 0) { e.markedForDeletion = true; stats.bossesDefeated++; activeLevel.goal = new Goal({x: 600, y: 320}); for(let k=0; k<50; k++) particles.push(new Particle(e.x, e.y, 'spark')); }
+                        }
+                    } else { e.markedForDeletion = true; score += 200; sfx('stomp'); if (e.type === 'onion') stats.onionsStomped++; for(let k=0; k<15; k++) particles.push(new Particle(e.x+20, e.y+20, 'smoke')); }
+                }
+
+                if (!e.markedForDeletion && player.x < e.x + e.w && player.x + player.w > e.x && player.y < e.y + e.h && player.y + player.h > e.y) {
+                    if (player.spicyTimer > 0) {
+                        if (e.type !== 'boss') { e.markedForDeletion = true; score += 100; sfx('stomp'); if (e.type === 'onion') stats.onionsStomped++; for(let k=0; k<10; k++) particles.push(new Particle(e.x, e.y, 'spark')); } 
+                        else {
+                            if (e.iframes <= 0) { e.hp--; e.iframes = 60; sfx('bossHit'); e.x += (player.x < e.x) ? 50 : -50; if (e.hp <= 0) { e.markedForDeletion = true; stats.bossesDefeated++; activeLevel.goal = new Goal({x: 600, y: 320}); } }
+                        }
+                    } else if (player.vy > 0 && player.y + player.h < e.y + e.h + 20) {
+                        if (e.iframes <= 0) {
+                            player.vy = -12; player.onGround = false;
+                            if (e.type === 'boss') {
+                                e.hp--; e.iframes = 60; sfx('bossHit'); e.x += (player.x < e.x) ? 50 : -50;
+                                if (e.hp <= 0) { e.markedForDeletion = true; stats.bossesDefeated++; activeLevel.goal = new Goal({x: 600, y: 320}); for(let k=0; k<50; k++) particles.push(new Particle(e.x, e.y, 'spark')); }
+                            } else { e.markedForDeletion = true; score += 100; sfx('stomp'); if (e.type === 'onion') stats.onionsStomped++; for(let k=0; k<10; k++) particles.push(new Particle(e.x+20, e.y+20, 'smoke')); }
+                        }
+                    } else { player.hit(); }
+                }
+            });
+            activeLevel.enemies = activeLevel.enemies.filter(e => !e.markedForDeletion);
+
+            activeLevel.items.forEach(i => {
+                if(!i.markedForDeletion && player.x < i.x+30 && player.x+player.w > i.x && player.y < i.y+30 && player.y+player.h > i.y) {
+                    i.markedForDeletion = true;
+                    if(i.type === 'coin') { score += 50; coins++; stats.coinsCollected++; sfx('coin'); for(let k=0; k<5; k++) particles.push(new Particle(i.x+15, i.y+15, 'spark')); } 
+                    else if (i.type === 'mushroom') { rawIngredients.mushroom++; sfx('ingredient'); } 
+                    else if (i.type === 'chili') { rawIngredients.chili++; sfx('ingredient'); } 
+                    else if (['tomato', 'basil', 'dough'].includes(i.type)) { rawIngredients[i.type]++; score += 50; sfx('ingredient'); }
+                }
+            });
+
+            if(activeLevel.goal) {
+                if(player.x > activeLevel.goal.x) {
+                    if(currentLevelIndex < LEVEL_DATA.length - 1) { startLevel(currentLevelIndex + 1); sfx('coin'); } 
+                    else { gameState = 'WIN'; sfx('win'); }
+                }
+            }
+
+            particles.forEach(p => p.update());
+            particles = particles.filter(p => p.life > 0);
+        }
+
+        function drawSky() {
+            const grad = c.createLinearGradient(0, 0, 0, canvas.height);
+            grad.addColorStop(0, '#5DADE2'); grad.addColorStop(1, '#D4E6F1');
+            c.fillStyle = grad; c.fillRect(0, 0, canvas.width, canvas.height);
+            
+            c.fillStyle = '#FFF9C4'; c.shadowBlur = 80; c.shadowColor = '#F4D03F'; c.beginPath(); c.arc(800, 150, 70, 0, Math.PI*2); c.fill(); c.shadowBlur = 0;
+            
+            c.save(); c.translate(800, 150); c.rotate(frameCount * 0.005); c.fillStyle = 'rgba(255, 255, 255, 0.15)';
+            for(let i=0; i<12; i++) { c.rotate(Math.PI / 6); c.beginPath(); c.moveTo(0,0); c.lineTo(400, -20); c.lineTo(400, 20); c.fill(); } c.restore();
+
+            clouds.forEach(cl => {
+                cl.x -= cl.speed; if(cl.x < -150) cl.x = canvas.width + 150;
+                c.fillStyle = 'rgba(255,255,255,0.8)';
+                c.beginPath(); c.arc(cl.x - camera.x * 0.1, cl.y, 40*cl.size, 0, Math.PI*2); c.fill();
+                c.beginPath(); c.arc(cl.x - camera.x * 0.1 + 35*cl.size, cl.y - 15*cl.size, 55*cl.size, 0, Math.PI*2); c.fill();
+                c.beginPath(); c.arc(cl.x - camera.x * 0.1 + 70*cl.size, cl.y, 35*cl.size, 0, Math.PI*2); c.fill();
+            });
+
+            c.fillStyle = '#78909c'; c.beginPath(); c.moveTo(0, 600);
+            for(let x=0; x<=canvas.width; x+=50) c.lineTo(x, 400 - Math.sin((x + camera.x*0.1) * 0.01) * 120); c.lineTo(canvas.width, 600); c.fill();
+
+            c.fillStyle = '#58D68D'; c.beginPath(); c.moveTo(0, 600);
+            for(let x=0; x<=canvas.width; x+=30) c.lineTo(x, 500 - Math.sin((x + camera.x*0.4) * 0.015) * 60); c.lineTo(canvas.width, 600); c.fill();
+        }
+
+        function drawHUD() {
+            c.fillStyle = 'rgba(0,0,0,0.6)'; c.fillRect(0, 0, canvas.width, 40);
+            c.fillStyle = '#f1c40f'; c.textAlign = 'left'; c.textBaseline = 'middle'; c.font = '12px "Press Start 2P"';
+            c.fillText(`SCORE: ${score}`, 20, 20);
+            c.fillStyle = '#f39c12'; c.fillText(`COINS: ${coins}`, 180, 20); 
+            c.fillStyle = '#ff4757'; c.textAlign = 'right'; c.fillText(`LIVES: ${lives}`, canvas.width - 20, 20);
+            c.fillStyle = 'white'; c.textAlign = 'center'; c.fillText(`[1]🍕:${crafted.pizza} [2]🍲:${crafted.soup} [3]🥗:${crafted.salad}`, canvas.width/2, 20);
+
+            if (equipped.power === 'timefreeze') {
+                c.fillStyle = '#00cec9'; c.font = '10px "Press Start 2P"';
+                if (timeFreezeTimer > 0) c.fillText(`FREEZE: ${Math.ceil(timeFreezeTimer/60)}s`, canvas.width/2, 60);
+                else if (powerCooldown > 0) c.fillText(`COOLDOWN: ${Math.ceil(powerCooldown/60)}s`, canvas.width/2, 60);
+                else c.fillText(`FREEZE READY (Z)`, canvas.width/2, 60);
+            }
+        }
+
+        function drawMenu() {
+            drawSky();
+            c.fillStyle = 'rgba(0,0,0,0.5)'; c.fillRect(0,0,canvas.width, canvas.height);
+            c.fillStyle = 'white'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.font = '40px "Press Start 2P"';
+            c.shadowBlur = 10; c.shadowColor = 'rgba(0,0,0,0.8)';
+            c.fillText("CHEF-A-TOOEY", canvas.width/2, 140);
+            c.font = '20px "Press Start 2P"'; c.fillStyle = '#f1c40f'; c.fillText("ULTIMATE EDITION", canvas.width/2, 190);
+            c.shadowBlur = 0;
+            menuBtns.forEach(btn => drawBtn(btn.x, btn.y, btn.w, btn.h, btn.c, btn.label));
+        }
+
+        function drawShop() {
+            c.fillStyle = 'rgba(0,0,0,0.85)'; c.fillRect(0,0,canvas.width, canvas.height);
+            drawBtn(20, 20, 100, 40, '#e74c3c', '< BACK', '12px "Press Start 2P"');
+            
+            c.font = '24px "Press Start 2P"'; c.fillStyle = '#f1c40f'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText("SOUS-CHEF'S SHOP", canvas.width/2, 60);
+
+            SHOP_ITEMS.forEach((item, i) => {
+                const col = i % 3; const row = Math.floor(i / 3); 
+                const ix = 60 + col * 310; const iy = 120 + row * 80;
+                
+                c.fillStyle = 'rgba(255,255,255,0.1)'; drawRounded(c, ix, iy, 290, 70, 8);
+                c.fillStyle = item.c1; c.fillRect(ix + 10, iy + 15, 40, 40);
+                c.fillStyle = '#fff'; c.textAlign = 'left'; c.textBaseline = 'middle'; c.font = '10px "Press Start 2P"'; c.fillText(item.name, ix + 60, iy + 30);
+                c.fillStyle = '#bdc3c7'; c.font = '8px "Press Start 2P"'; c.fillText(`Type: ${item.type.toUpperCase()}`, ix + 60, iy + 50);
+                
+                const isOwned = inventory[item.type] && inventory[item.type].includes(item.id);
+                let isEquipped = false;
+                if (item.type === 'pet') isEquipped = equipped.pets.includes(item.id); else isEquipped = equipped[item.type] === item.id;
+                
+                let btnColor = isEquipped ? '#2ecc71' : (isOwned ? '#3498db' : '#e67e22');
+                let btnText = isEquipped ? 'EQUIP\'D' : (isOwned ? 'EQUIP' : `${item.cost} COIN`);
+                if(!isOwned && coins < item.cost) btnColor = '#7f8c8d'; 
+
+                drawBtn(ix + 180, iy + 15, 100, 40, btnColor, btnText, '9px "Press Start 2P"');
+            });
+            c.fillStyle = '#f1c40f'; c.textAlign = 'center'; c.font = '12px "Press Start 2P"'; c.fillText(`COINS: ${coins}`, canvas.width/2, 100);
+        }
+
+        function drawQuests() {
+            c.fillStyle = 'rgba(0,0,0,0.85)'; c.fillRect(0,0,canvas.width, canvas.height);
+            drawBtn(20, 20, 100, 40, '#e74c3c', '< BACK', '12px "Press Start 2P"');
+            c.font = '24px "Press Start 2P"'; c.fillStyle = '#9b59b6'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText("QUEST BOARD", canvas.width/2, 60);
+
+            QUESTS.forEach((q, i) => {
+                const yPos = 150 + (i * 80);
+                c.fillStyle = 'rgba(255,255,255,0.1)'; drawRounded(c, 150, yPos, 724, 70, 8);
+                c.fillStyle = '#f1c40f'; c.textAlign = 'left'; c.font = '14px "Press Start 2P"'; c.fillText(q.name, 180, yPos+30);
+                c.fillStyle = '#bdc3c7'; c.font = '10px "Press Start 2P"'; c.fillText(q.desc, 180, yPos+50);
+
+                let currentProg = stats[q.stat] || 0;
+                const isDone = currentProg >= q.target;
+                c.fillStyle = isDone ? '#2ecc71' : '#fff'; c.textAlign = 'right'; c.font = '12px "Press Start 2P"'; c.fillText(`${Math.min(currentProg, q.target)}/${q.target}`, 730, yPos+40);
+
+                let btnColor = q.claimed ? '#7f8c8d' : (isDone ? '#2ecc71' : '#34495e');
+                let btnText = q.claimed ? 'DONE' : (isDone ? 'CLAIM' : `${q.reward} COIN`);
+                drawBtn(750, yPos + 15, 120, 40, btnColor, btnText, '10px "Press Start 2P"');
+            });
+        }
+
+        function drawMods() {
+            c.fillStyle = 'rgba(0,0,0,0.85)'; c.fillRect(0,0,canvas.width, canvas.height);
+            drawBtn(20, 20, 100, 40, '#e74c3c', '< BACK', '12px "Press Start 2P"');
+            c.font = '24px "Press Start 2P"'; c.fillStyle = '#34495e'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText("MOD LAB", canvas.width/2, 60);
+
+            // Left Side: Standard Mods
+            MODS.forEach((mod, i) => {
+                const yPos = 120 + (i * 80);
+                c.fillStyle = 'rgba(255,255,255,0.1)'; drawRounded(c, 100, yPos, 450, 70, 8);
+                c.fillStyle = '#f1c40f'; c.textAlign = 'left'; c.font = '14px "Press Start 2P"'; c.fillText(mod.name, 120, yPos+30);
+                c.fillStyle = '#bdc3c7'; c.font = '10px "Press Start 2P"'; c.fillText(mod.desc, 120, yPos+50);
+                const isActive = activeMods[mod.id];
+                drawBtn(410, yPos + 15, 120, 40, isActive ? '#2ecc71' : '#e74c3c', isActive ? "ON" : "OFF", '10px "Press Start 2P"');
+            });
+
+            // Right Side: Mod Editor
+            c.fillStyle = 'rgba(255,255,255,0.1)'; drawRounded(c, 600, 120, 350, 230, 8);
+            c.fillStyle = '#f1c40f'; c.textAlign = 'center'; c.font = '14px "Press Start 2P"'; c.fillText("MOD EDITOR", 775, 150);
+            
+            c.fillStyle = '#fff'; c.font = '10px "Press Start 2P"'; 
+            
+            c.fillText(`GRAVITY: ${activeMods.customGravity.toFixed(1)}`, 775, 190);
+            drawBtn(650, 175, 40, 30, '#e74c3c', '-'); drawBtn(860, 175, 40, 30, '#2ecc71', '+');
+
+            c.fillText(`SPEED: ${activeMods.customSpeed}`, 775, 250);
+            drawBtn(650, 235, 40, 30, '#e74c3c', '-'); drawBtn(860, 235, 40, 30, '#2ecc71', '+');
+
+            c.fillText(`JUMP: ${activeMods.customJump}`, 775, 310);
+            drawBtn(650, 295, 40, 30, '#e74c3c', '-'); drawBtn(860, 295, 40, 30, '#2ecc71', '+');
+        }
+
+        function drawKitchen() {
+            c.fillStyle = 'rgba(0,0,0,0.85)'; c.fillRect(0,0,canvas.width, canvas.height);
+            drawBtn(20, 20, 100, 40, '#e74c3c', '< BACK', '12px "Press Start 2P"');
+            c.font = '24px "Press Start 2P"'; c.fillStyle = '#e74c3c'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText("THE KITCHEN", canvas.width/2, 60);
+
+            c.textAlign = 'left'; c.font = '14px "Press Start 2P"'; c.fillStyle = '#fff'; c.fillText("BAG", 50, 120);
+            const ings = ['tomato', 'basil', 'dough', 'mushroom', 'chili'];
+            const icons = ['🍅 Tomato', '🌿 Basil', '🥖 Dough', '🍄 Shroom', '🌶️ Chili'];
+            ings.forEach((key, i) => {
+                drawBtn(50, 150 + i * 60, 200, 50, 'rgba(255,255,255,0.1)', `${icons[i]} x${rawIngredients[key]}`, '12px "Press Start 2P"');
+            });
+
+            c.fillStyle = '#2c3e50'; drawRounded(c, 350, 150, 220, 280, 20); c.fillStyle = '#34495e'; c.fillRect(360, 160, 200, 260);
+            c.textAlign = 'center'; c.fillStyle = '#f1c40f'; c.fillText("THE POT", 460, 190);
+            c.fillStyle = '#fff'; c.font = '12px "Press Start 2P"'; kitchenPot.forEach((item, i) => { c.fillText(`+ ${item.toUpperCase()}`, 460, 230 + i*40); });
+            
+            drawBtn(350, 450, 100, 40, '#e74c3c', 'CLEAR', '10px "Press Start 2P"');
+            drawBtn(470, 450, 100, 40, '#2ecc71', 'COOK!', '10px "Press Start 2P"');
+
+            c.textAlign = 'left'; c.fillStyle = '#fff'; c.font = '14px "Press Start 2P"'; c.fillText("RECIPES", 650, 120);
+            c.font = '10px "Press Start 2P"';
+            c.fillStyle = '#f1c40f'; c.fillText("🍅+🌿+🥖 = Pizza🍕 (+Life)", 650, 180);
+            c.fillStyle = '#e74c3c'; c.fillText("🌶️+🍄 = Spicy Soup🍲 (Invinc)", 650, 230);
+            c.fillStyle = '#00cec9'; c.fillText("🍄+🌿 = Magic Salad🥗 (Freeze)", 650, 280);
+        }
+
+        function drawEditor() {
+            drawSky();
+            c.strokeStyle = 'rgba(255, 255, 255, 0.3)'; c.lineWidth = 1;
+            for(let i=0; i<canvas.width; i+=40) { c.beginPath(); c.moveTo(i,80); c.lineTo(i,canvas.height); c.stroke(); }
+            for(let i=80; i<canvas.height; i+=40) { c.beginPath(); c.moveTo(0,i); c.lineTo(canvas.width,i); c.stroke(); }
+            
+            customLevel.platforms.forEach(p => new Platform(p).draw(c, camera.x));
+            customLevel.enemies.forEach(e => new Enemy(e.x, e.y, e.type, 0).draw(c, camera.x));
+            customLevel.items.forEach(i => new Item(i.x, i.y, i.type).draw(c, camera.x));
+            if(customLevel.goal) new Goal(customLevel.goal).draw(c, camera.x);
+
+            c.fillStyle = 'rgba(0,0,0,0.85)'; c.fillRect(0,0,canvas.width, 80);
+            
+            editorTools.forEach(b => drawEditorBtn(b, editorTool === b.id));
+            editorActions.forEach(b => drawEditorBtn(b, false));
+
+            c.fillStyle = 'rgba(0,0,0,0.5)'; c.fillRect(10, canvas.height - 40, 300, 30);
+            c.fillStyle = 'white'; c.textAlign = 'left'; c.textBaseline = 'middle'; c.font = '10px "Press Start 2P"'; c.fillText(`CAM: Use Left/Right arrows to scroll`, 20, canvas.height - 25);
+        }
+
+        function loop() {
+            frameCount++;
+            c.clearRect(0,0,canvas.width, canvas.height);
+            
+            if(gameState === 'PLAY') updatePlay();
+            
+            if(gameState === 'PLAY' || gameState === 'EDITOR') { 
+                if (gameState === 'PLAY') drawSky(); 
+            }
+            
+            if(gameState === 'MENU') drawMenu();
+            else if (gameState === 'SHOP') drawShop();
+            else if (gameState === 'QUESTS') drawQuests();
+            else if (gameState === 'KITCHEN') drawKitchen();
+            else if (gameState === 'MODS') drawMods();
+            else if (gameState === 'EDITOR') drawEditor();
+            else if (gameState === 'PLAY') {
+                activeLevel.platforms.forEach(p => p.draw(c, camera.x));
+                if(activeLevel.goal) activeLevel.goal.draw(c, camera.x);
+                activeLevel.items.forEach(i => !i.markedForDeletion && i.draw(c, camera.x));
+                activeLevel.enemies.forEach(e => e.draw(c, camera.x));
+                player.draw(c, camera.x);
+                if (equipped.pets.length > 0) {
+                    equipped.pets.forEach((petId, idx) => {
+                        if (petPositions[idx]) {
+                            const px = petPositions[idx].x - camera.x; const py = petPositions[idx].y;
+                            if (petId === 'jimmybob') {
+                                c.fillStyle = '#3498db'; c.beginPath(); c.arc(px + 10, py + 10, 12, 0, Math.PI*2); c.fill();
+                                c.fillStyle = 'white'; c.beginPath(); c.arc(px + 5 + (player.facing*3), py + 5, 4, 0, Math.PI*2); c.fill(); c.beginPath(); c.arc(px + 15 + (player.facing*3), py + 5, 4, 0, Math.PI*2); c.fill();
+                                c.fillStyle = 'black'; c.beginPath(); c.arc(px + 5 + (player.facing*4), py + 5, 2, 0, Math.PI*2); c.fill(); c.beginPath(); c.arc(px + 15 + (player.facing*4), py + 5, 2, 0, Math.PI*2); c.fill();
+                                c.fillStyle = '#fff'; c.beginPath(); c.moveTo(px, py-2); c.bezierCurveTo(px-5, py-15, px+25, py-15, px+20, py-2); c.fill();
+                            } else if (petId === 'petspatula') {
+                                c.save(); c.translate(px + 10, py + 10); c.rotate(Math.sin(frameCount * 0.1) * 0.3);
+                                c.fillStyle = '#e74c3c'; c.fillRect(-3, -15, 6, 25); 
+                                c.fillStyle = '#f1c40f'; drawRounded(c, -10, -25, 20, 15, 2);
+                                c.fillStyle = '#111'; c.fillRect(-6, -20, 12, 2); c.fillRect(-6, -15, 12, 2);
+                                c.fillStyle = 'white'; c.beginPath(); c.arc(-4 + (player.facing*2), 0, 3, 0, Math.PI*2); c.fill(); c.beginPath(); c.arc(4 + (player.facing*2), 0, 3, 0, Math.PI*2); c.fill();
+                                c.fillStyle = 'black'; c.beginPath(); c.arc(-4 + (player.facing*3), 0, 1.5, 0, Math.PI*2); c.fill(); c.beginPath(); c.arc(4 + (player.facing*3), 0, 1.5, 0, Math.PI*2); c.fill();
+                                c.restore();
+                            }
+                        }
+                    });
+                }
+                particles.forEach(p => p.draw(c, camera.x));
+                if (timeFreezeTimer > 0) { c.fillStyle = 'rgba(0, 200, 255, 0.2)'; c.fillRect(0, 0, canvas.width, canvas.height); }
+                drawHUD();
+            } else if (gameState === 'GAMEOVER') {
+                c.fillStyle = 'rgba(0,0,0,0.8)'; c.fillRect(0,0,canvas.width, canvas.height); c.fillStyle = '#e74c3c'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.font = '40px "Press Start 2P"'; c.fillText("GAME OVER", canvas.width/2, 250); c.fillStyle = 'white'; c.font = '16px "Press Start 2P"'; c.fillText("Click to Return", canvas.width/2, 320);
+            } else if (gameState === 'WIN') {
+                c.fillStyle = 'rgba(46, 204, 113, 0.9)'; c.fillRect(0,0,canvas.width, canvas.height); c.fillStyle = 'white'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.font = '40px "Press Start 2P"'; c.fillText("YOU WON!", canvas.width/2, 250); c.font = '16px "Press Start 2P"'; c.fillText(`FINAL SCORE: ${score}`, canvas.width/2, 320);
+            }
+
+            requestAnimationFrame(loop);
+        }
+
+        // Init Interactions
+        canvas.addEventListener('pointerdown', e => {
+            initAudio();
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width; const scaleY = canvas.height / rect.height;
+            const x = (e.clientX - rect.left) * scaleX; const y = (e.clientY - rect.top) * scaleY;
+
+            if(gameState === 'MENU') {
+                menuBtns.forEach(btn => { if(x >= btn.x && x <= btn.x+btn.w && y >= btn.y && y <= btn.y+btn.h) btn.action(); });
+            } else if(gameState === 'SHOP') {
+                if (x >= 20 && x <= 120 && y >= 20 && y <= 60) { gameState = 'MENU'; return; }
+                SHOP_ITEMS.forEach((item, i) => {
+                    const col = i % 3; const row = Math.floor(i / 3); 
+                    const ix = 60 + col * 310; const iy = 120 + row * 80;
+                    if (x >= ix + 180 && x <= ix + 280 && y >= iy + 15 && y <= iy + 55) {
+                        const isOwned = inventory[item.type] && inventory[item.type].includes(item.id);
+                        if(isOwned) {
+                            if (item.type === 'pet') { if (equipped.pets.includes(item.id)) equipped.pets = equipped.pets.filter(p => p !== item.id); else equipped.pets.push(item.id); } 
+                            else { equipped[item.type] = item.id; }
+                            sfx('powerup');
+                        } else if (coins >= item.cost) {
+                            coins -= item.cost; inventory[item.type].push(item.id);
+                            if (item.type === 'pet') equipped.pets.push(item.id); else equipped[item.type] = item.id;
+                            sfx('buy');
+                        } else { sfx('error'); }
+                    }
+                });
+            } else if(gameState === 'QUESTS') {
+                if (x >= 20 && x <= 120 && y >= 20 && y <= 60) { gameState = 'MENU'; return; }
+                QUESTS.forEach((q, i) => {
+                    const yPos = 150 + (i * 80);
+                    if (x >= 750 && x <= 870 && y >= yPos + 15 && y <= yPos + 55) {
+                        let currentProg = stats[q.stat] || 0;
+                        if(currentProg >= q.target && !q.claimed) { q.claimed = true; coins += q.reward; sfx('coin'); }
+                    }
+                });
+            } else if(gameState === 'MODS') {
+                if (x >= 20 && x <= 120 && y >= 20 && y <= 60) { gameState = 'MENU'; return; }
+                
+                // Regular Mods
+                MODS.forEach((mod, i) => {
+                    const yPos = 120 + (i * 80);
+                    if (x >= 410 && x <= 530 && y >= yPos + 15 && y <= yPos + 55) { activeMods[mod.id] = !activeMods[mod.id]; sfx('powerup'); }
+                });
+
+                // Custom Mod Editor logic
+                // Gravity
+                if (x >= 650 && x <= 690 && y >= 175 && y <= 205) { activeMods.customGravity = Math.max(0, activeMods.customGravity - 0.1); sfx('bump'); }
+                if (x >= 860 && x <= 900 && y >= 175 && y <= 205) { activeMods.customGravity += 0.1; sfx('bump'); }
+                // Speed
+                if (x >= 650 && x <= 690 && y >= 235 && y <= 265) { activeMods.customSpeed = Math.max(1, activeMods.customSpeed - 1); sfx('bump'); }
+                if (x >= 860 && x <= 900 && y >= 235 && y <= 265) { activeMods.customSpeed += 1; sfx('bump'); }
+                // Jump
+                if (x >= 650 && x <= 690 && y >= 295 && y <= 325) { activeMods.customJump = Math.max(5, activeMods.customJump - 1); sfx('bump'); }
+                if (x >= 860 && x <= 900 && y >= 295 && y <= 325) { activeMods.customJump += 1; sfx('bump'); }
+
+            } else if(gameState === 'KITCHEN') {
+                if (x >= 20 && x <= 120 && y >= 20 && y <= 60) { gameState = 'MENU'; return; }
+                const ings = ['tomato', 'basil', 'dough', 'mushroom', 'chili'];
+                ings.forEach((key, i) => {
+                    const yPos = 150 + i * 60;
+                    if (x >= 50 && x <= 250 && y >= yPos && y <= yPos + 50) {
+                        if (rawIngredients[key] > 0 && kitchenPot.length < 3) { rawIngredients[key]--; kitchenPot.push(key); sfx('bump'); } else { sfx('error'); }
+                    }
+                });
+                if (x >= 350 && x <= 450 && y >= 450 && y <= 490) { kitchenPot.forEach(k => rawIngredients[k]++); kitchenPot = []; sfx('bump'); }
+                if (x >= 470 && x <= 570 && y >= 450 && y <= 490) {
+                    if (kitchenPot.length > 0) {
+                        sfx('cook'); let has = (item) => kitchenPot.includes(item);
+                        if (kitchenPot.length === 3 && has('tomato') && has('basil') && has('dough')) { setTimeout(() => { sfx('perfectPizza'); crafted.pizza++; stats.pizzasMade++; }, 400); } 
+                        else if (kitchenPot.length === 2 && has('chili') && has('mushroom')) { setTimeout(() => { sfx('powerup'); crafted.soup++; }, 400); } 
+                        else if (kitchenPot.length === 2 && has('mushroom') && has('basil')) { setTimeout(() => { sfx('powerup'); crafted.salad++; }, 400); } 
+                        else { setTimeout(() => { sfx('error'); }, 400); }
+                        kitchenPot = [];
+                    }
+                }
+            } else if(gameState === 'EDITOR') {
+                let clickedBtn = false;
+                editorTools.forEach(b => { if(x >= b.x && x <= b.x+b.w && y >= 20 && y <= 60) { editorTool = b.id; clickedBtn = true; } });
+                editorActions.forEach(b => {
+                    if(x >= b.x && x <= b.x+b.w && y >= 20 && y <= 60) {
+                        clickedBtn = true;
+                        if(b.id === 'test') startLevel(-1);
+                        if(b.id === 'clear') { customLevel = { platforms: [], enemies: [], items: [], goal: null }; }
+                        if(b.id === 'exit') gameState = 'MENU';
+                    }
+                });
+                if(!clickedBtn && y > 80) {
+                    const gx = Math.floor((x + camera.x) / 40) * 40; const gy = Math.floor(y / 40) * 40; const cl = customLevel;
+                    if(editorTool === 'eraser') {
+                        cl.platforms = cl.platforms.filter(p => !(gx>=p.x && gx<p.x+p.w && gy>=p.y && gy<p.y+p.h));
+                        cl.enemies = cl.enemies.filter(e => !(gx===e.x && gy===e.y));
+                        cl.items = cl.items.filter(i => !(gx===i.x && gy===i.y));
+                        if(cl.goal && gx===cl.goal.x && gy===cl.goal.y) cl.goal = null;
+                    } else if (['wood','cheese'].includes(editorTool)) { cl.platforms.push({x:gx, y:gy, w:40, h:40, type:editorTool}); } 
+                    else if (['onion','meatball'].includes(editorTool)) { cl.enemies.push({x:gx, y:gy, type:editorTool, dist:100}); } 
+                    else if (['coin', 'chili', 'tomato', 'basil', 'dough', 'mushroom'].includes(editorTool)) { cl.items.push({x:gx, y:gy, type:editorTool}); } 
+                    else if (editorTool === 'goal') { cl.goal = {x:gx, y:gy}; }
+                }
+            } else if(gameState === 'GAMEOVER' || gameState === 'WIN') { gameState = 'MENU'; }
+        });
+
+        // Initialize Clouds
+        for(let i=0; i<12; i++) clouds.push({x: Math.random()*canvas.width*2, y: Math.random()*250, speed: 0.1+Math.random()*0.3, size: 0.5+Math.random()*0.8});
+        requestAnimationFrame(loop); // Start
+
+    </script>
+</body>
+</html>
